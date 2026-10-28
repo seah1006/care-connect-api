@@ -27,10 +27,10 @@
 - [불변식 목록](docs/invariants/INVARIANTS.md): 언제나 참이어야 하는 성질과 검증 위치
 - [작업 방식](CLAUDE.md): 계획·리뷰는 Claude, 구현은 Codex([규칙](AGENTS.md))
 
-## 기술 스택 (예정)
+## 기술 스택
 
-- Java, Spring Boot
-- RDB (MySQL 또는 PostgreSQL, ADR로 결정)
+- Java 25, Spring Boot 4.1
+- PostgreSQL 17 (Flyway 마이그레이션)
 - JWT 인증, 역할 기반 권한
 
 ## 개발 환경

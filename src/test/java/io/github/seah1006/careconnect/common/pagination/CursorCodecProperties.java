@@ -93,6 +93,26 @@ class CursorCodecProperties {
     }
 
     @Example
+    void INV_API_004_rejectsNullSigningKey() {
+        assertThatThrownBy(() -> new CursorCodec(null)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Example
+    void INV_API_004_rejectsSigningKeysShorterThan32Bytes() {
+        for (int length : new int[] {0, 31}) {
+            assertThatThrownBy(() -> new CursorCodec(new byte[length]))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Example
+    void INV_API_004_accepts32ByteSigningKey() {
+        CursorCodec minimumKeyCodec = new CursorCodec(new byte[32]);
+        Cursor cursor = new Cursor("synthetic", new UUID(0, 0));
+        assertThat(minimumKeyCodec.decode(minimumKeyCodec.encode(cursor))).isEqualTo(cursor);
+    }
+
+    @Example
     void INV_API_004_constructorDefensivelyCopiesSigningKey() {
         byte[] mutableKey = TEST_KEY.clone();
         CursorCodec original = new CursorCodec(mutableKey);

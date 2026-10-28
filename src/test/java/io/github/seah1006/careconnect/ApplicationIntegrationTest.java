@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -33,6 +34,9 @@ class ApplicationIntegrationTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    ObjectMapper objectMapper;
+
     @LocalServerPort
     int port;
 
@@ -47,7 +51,7 @@ class ApplicationIntegrationTest {
                     URI.create("http://localhost:" + port + "/actuator/health")).GET().build(),
                     HttpResponse.BodyHandlers.ofString());
             assertThat(response.statusCode()).isEqualTo(200);
-            assertThat(response.body()).isEqualTo("{\"status\":\"UP\"}");
+            assertThat(objectMapper.readTree(response.body()).path("status").asString()).isEqualTo("UP");
         }
     }
 }

@@ -17,6 +17,9 @@ public final class CursorCodec {
     private final SecretKeySpec key;
 
     public CursorCodec(byte[] key) {
+        if (key == null || key.length < 32) {
+            throw new IllegalArgumentException("Signing key must contain at least 32 bytes");
+        }
         this.key = new SecretKeySpec(key, "HmacSHA256");
     }
 

@@ -146,3 +146,14 @@ Spring Boot 프로젝트를 만들고, ADR 0008의 검증 계층(L1~L6)이 **실
 리뷰어가 직접 처리한 것:
 
 - `gradlew` 실행 권한을 git index에 등록 (`git add --chmod=+x gradlew`)
+
+### 2회차 (2026-10-28, Claude)
+
+샌드박스 밖에서 `./gradlew clean check pitest tlcCheck` (Docker 포함) 실행 결과: **통과**.
+
+- 테스트: ApplicationIntegrationTest 1, ArchitectureTest 1, CursorCodecProperties 9. 실패·건너뜀 0
+- PIT: 변이 26개 중 25개 탐지 (96%), 기준 80%
+- TLC: PipelineSmoke 고유 상태 3개, 오류 없음
+- 1회차 지적 3건 모두 반영 확인. 범위 밖 변경, 보호 경로 변경, 테스트 약화 없음
+
+판단: 병합.

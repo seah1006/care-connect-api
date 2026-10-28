@@ -18,7 +18,7 @@ DB는 멀티테넌트 격리(0001), 민감정보 보호(0005), 동의 기록 같
 
 ## 결정
 
-- **Java 25 (LTS)** 와 Spring Boot 최신 안정 버전. Spring Boot 정확한 버전은 프로젝트를 생성할 때 이 문서에 적는다.
+- **Java 25 (LTS)** 와 Spring Boot 최신 안정 버전. Spring Boot는 **4.1.2** (2026-10-28 프로젝트 생성 시점의 최신 안정 버전), Gradle Wrapper 9.7.1.
 - 빌드: Gradle (Kotlin DSL). JDK는 Gradle toolchain으로 25에 고정하고, 없으면 자동으로 내려받게 한다(foojay toolchain resolver). 개발자 PC에 어떤 JDK가 깔려 있든 빌드 결과가 같아야 하기 때문이다.
 - DB: **PostgreSQL**
   - 0001의 2차 방어선인 행 수준 보안을 DB가 직접 지원한다.
