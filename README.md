@@ -24,6 +24,8 @@
 ## 문서
 
 - [기술 결정 기록 (ADR)](docs/adr/README.md)
+- [불변식 목록](docs/invariants/INVARIANTS.md): 언제나 참이어야 하는 성질과 검증 위치
+- [작업 방식](CLAUDE.md): 계획·리뷰는 Claude, 구현은 Codex([규칙](AGENTS.md))
 
 ## 기술 스택 (예정)
 

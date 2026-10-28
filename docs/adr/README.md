@@ -20,6 +20,7 @@
 | [0005](0005-sensitive-data-protection.md) | 민감정보 보호: 애플리케이션 레벨 암호화와 접속기록 | 제안 |
 | [0006](0006-api-conventions.md) | REST API 공통 규칙 | 제안 |
 | [0007](0007-deployment.md) | 배포: 컨테이너 + 국내 리전 | 제안 |
+| [0008](0008-verification-strategy.md) | 검증 전략: 불변식 우선 + 다층 검증 | 제안 |
 
 ## 작성 형식
 

@@ -30,3 +30,6 @@ application-local.properties
 # Real data must never be committed
 data/real/
 *.hwp
+
+# Codex run reports (local only)
+.codex-runs/
