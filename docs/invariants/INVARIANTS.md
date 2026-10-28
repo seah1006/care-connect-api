@@ -22,8 +22,9 @@ L1 DB 제약 · L2 성질 기반 테스트(jqwik) · L3 모델 검사(TLA+/TLC) 
 | INV-TEN-001 | 어떤 사용자도 자기 소속이 아닌 기관의 데이터를 조회·수정할 수 없다 | L1(RLS), L2, L5 | ADR 0001 | - | 제안 |
 | INV-TEN-002 | 기관 소유 엔티티는 모두 기관 ID를 가지며 null일 수 없다 | L1(NOT NULL), L4 | ADR 0001 | - | 제안 |
 | INV-TEN-003 | 요청이 끝나면 테넌트 컨텍스트는 항상 비어 있다 (다음 요청으로 새지 않는다) | L2, L5 | ADR 0001 | - | 제안 |
-| INV-AUTH-001 | 하나의 refresh 토큰은 최대 한 번만 새 토큰으로 교환된다 | L1(UNIQUE/상태), L3, L5 | ADR 0003 | - | 제안 |
-| INV-AUTH-002 | 이미 사용된 refresh 토큰이 다시 제출되면, 그 토큰 묶음 전체가 폐기 상태가 된다 | L2, L3 | ADR 0003 | - | 제안 |
+| INV-TEN-004 | access 토큰의 기관 ID는 그 사용자가 실제로 소속된 기관이다 | L2, L5 | ADR 0003, 0004 | - | 제안 |
+| INV-AUTH-001 | 하나의 refresh 토큰은 최대 한 번만 새 토큰으로 교환된다 (한 묶음에 살아 있는 토큰은 최대 하나) | L1(UNIQUE/상태), L3, L5 | ADR 0003 | L3: `docs/spec/RefreshTokenRotation.tla` (검사 완료, 반례 기록 `.md`) | 제안 (L3 완료) |
+| INV-AUTH-002 | 이미 사용된 refresh 토큰이 다시 제출되면, 그 토큰 묶음 전체가 폐기 상태가 된다 | L2, L3, L5 | ADR 0003 | L3: `docs/spec/RefreshTokenRotation.tla` (검사 완료) | 제안 (L3 완료) |
 | INV-AUTH-003 | 비밀번호와 refresh 토큰은 DB에 평문으로 저장되지 않는다 | L2, L4 | ADR 0003 | - | 제안 |
 | INV-AUTHZ-001 | 보호자는 관계가 등록된 이용자의 데이터에만 접근한다 | L2, L5 | ADR 0004 | - | 제안 |
 | INV-AUTHZ-002 | 다른 기관 리소스에 대한 요청은 항상 404이며, 존재 여부가 응답으로 드러나지 않는다 | L2 | ADR 0004 | - | 제안 |
