@@ -141,4 +141,29 @@ TLA+ 모델(`docs/spec/RefreshTokenRotation.tla`)과 같은 규칙으로 동작�
 
 ## 리뷰 기록
 
-(리뷰 후 Claude가 추가)
+### 1회차 (2026-10-28, Claude)
+
+샌드박스 밖에서 `./gradlew clean check pitest tlcCheck` (Docker 포함): **실패**. 41개 중 5개 실패, 모두 `identity.ApplicationIntegrationTest`.
+교체 로직(조건부 UPDATE, USED면 묶음 폐기)은 TLA+ 모델과 일치. 범위, 보호 경로, 테스트 약화 문제 없음.
+
+고칠 것:
+
+1. **테스트 컨테이너 수명 문제 (실패 원인)**
+   - 증상: 5개 테스트가 `CannotGetJdbcConnectionException` / `Connection refused`.
+   - 원인: `PostgresSupport` 가 `@Testcontainers` + `@Container static` 이라 테스트 클래스가 끝날 때마다 컨테이너가 멈춘다. 다음 클래스는 새 포트로 다시 뜨지만, Spring 테스트 컨텍스트 캐시는 이전 포트를 들고 있다.
+   - 수정: 싱글톤 컨테이너 패턴. `@Testcontainers`/`@Container` 를 제거하고 static 초기화 블록에서 한 번만 `start()` 해 JVM 수명 동안 유지한다 (종료는 Testcontainers Ryuk에 맡김). 모든 Docker 테스트가 이 하나의 컨테이너를 쓴다.
+   - 첫 번째 `ApplicationIntegrationTest` (루트 패키지)도 같은 지원 클래스를 쓰도록 맞춘다.
+   - 샌드박스에서는 실행할 수 없으니 컴파일까지 확인하고 "리뷰어 재실행 필요"를 적는다.
+2. `JdbcAuthStore.markUsed(id, now)` 가 `now` 를 쓰지 않고 DB `now()` 를 쓴다. 다른 시각은 모두 주입된 `Clock` 을 따르므로 `used_at` 도 인자로 받은 시각을 쓴다. 조건부 UPDATE의 `AND status='ACTIVE'` 는 그대로 유지.
+
+### 2회차 (2026-10-28, Claude)
+
+샌드박스 밖에서 `./gradlew clean check pitest tlcCheck` (Docker 포함): **통과**.
+
+- 테스트 41개 전부 통과 (Docker 통합 테스트 9개 포함)
+- PIT: 변이 100개 중 90개 탐지 (90%), 기준 80%
+- TLC: PipelineSmoke, RefreshTokenRotation(고유 상태 160개) 위반 없음
+- 리뷰어 음성 확인: `AND status='ACTIVE'` 제거 시 `eightConcurrentRefreshesFollowUseCasTrueForTwentyFamilies`, `sequentialReuseCommitsRevocationBeforeReturningFailure`, `JdbcAuthStoreTest` 실패. DB 유니크 인덱스가 두 번째 ACTIVE 토큰 삽입을 거부. 원복 확인
+- 1회차 지적 2건 반영 확인. 범위 밖 변경, 보호 경로 변경, 테스트 약화 없음
+
+판단: 병합.

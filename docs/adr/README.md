@@ -13,7 +13,7 @@
 
 | 번호 | 제목 | 상태 |
 |---|---|---|
-| [0001](0001-multi-tenancy.md) | 멀티테넌트: 공유 스키마 + 기관 ID | 제안 |
+| [0001](0001-multi-tenancy.md) | 멀티테넌트: 공유 스키마 + 기관 ID | 확정 |
 | [0002](0002-tech-stack-and-database.md) | 기술 스택과 DB: Java 25 + Spring Boot + PostgreSQL | 확정 |
 | [0003](0003-authentication.md) | 인증: 사용자 유형별 인증 방식 분리 | 제안 |
 | [0004](0004-authorization.md) | 권한: 기관 소속 역할 + 리소스 범위 | 제안 |

@@ -19,20 +19,20 @@ L1 DB 제약 · L2 성질 기반 테스트(jqwik) · L3 모델 검사(TLA+/TLC) 
 
 | ID | 불변식 | 계층 | 근거 | 테스트 위치 | 상태 |
 |---|---|---|---|---|---|
-| INV-TEN-001 | 어떤 사용자도 자기 소속이 아닌 기관의 데이터를 조회·수정할 수 없다 | L1(RLS), L2, L5 | ADR 0001 | - | 제안 |
-| INV-TEN-002 | 기관 소유 엔티티는 모두 기관 ID를 가지며 null일 수 없다 | L1(NOT NULL), L4 | ADR 0001 | - | 제안 |
-| INV-TEN-003 | 요청이 끝나면 테넌트 컨텍스트는 항상 비어 있다 (다음 요청으로 새지 않는다) | L2, L5 | ADR 0001 | - | 제안 |
-| INV-TEN-004 | access 토큰의 기관 ID는 그 사용자가 실제로 소속된 기관이다 | L2, L5 | ADR 0003, 0004 | - | 제안 |
-| INV-AUTH-001 | 하나의 refresh 토큰은 최대 한 번만 새 토큰으로 교환된다 (한 묶음에 살아 있는 토큰은 최대 하나) | L1(UNIQUE/상태), L3, L5 | ADR 0003 | L3: `docs/spec/RefreshTokenRotation.tla` (검사 완료, 반례 기록 `.md`) | 제안 (L3 완료) |
-| INV-AUTH-002 | 이미 사용된 refresh 토큰이 다시 제출되면, 그 토큰 묶음 전체가 폐기 상태가 된다 | L2, L3, L5 | ADR 0003 | L3: `docs/spec/RefreshTokenRotation.tla` (검사 완료) | 제안 (L3 완료) |
-| INV-AUTH-003 | 비밀번호와 refresh 토큰은 DB에 평문으로 저장되지 않는다 | L2, L4 | ADR 0003 | - | 제안 |
+| INV-TEN-001 | 어떤 사용자도 자기 소속이 아닌 기관의 데이터를 조회·수정할 수 없다 | L1(RLS), L2, L5 | ADR 0001 | RLS 정책(V2) + `identity/ApplicationIntegrationTest` (WHERE 없는 원시 SQL, 교차 기관 쓰기 거부, 컨텍스트 없을 때 0행) | 확정 (TASK-002) |
+| INV-TEN-002 | 기관 소유 엔티티는 모두 기관 ID를 가지며 null일 수 없다 | L1(NOT NULL), L4 | ADR 0001 | `TenantArchitectureTest` + `org_id not null` | 확정 (TASK-002) |
+| INV-TEN-003 | 요청이 끝나면 테넌트 컨텍스트는 항상 비어 있다 (다음 요청으로 새지 않는다) | L2, L5 | ADR 0001 | `TenantContextProperties`, `TenantRequestFilterTest` (ScopedValue로 구조적 보장) | 확정 (TASK-002) |
+| INV-TEN-004 | access 토큰의 기관 ID는 그 사용자가 실제로 소속된 기관이다 | L2, L5 | ADR 0003, 0004 | `AuthStateProperties`, `AuthServiceTest`, `identity/ApplicationIntegrationTest` | 확정 (TASK-002) |
+| INV-AUTH-001 | 하나의 refresh 토큰은 최대 한 번만 새 토큰으로 교환된다 (한 묶음에 살아 있는 토큰은 최대 하나) | L1(UNIQUE/상태), L3, L5 | ADR 0003 | L1: 유니크 인덱스 `refresh_token_single_active`, `refresh_token_single_child` / L3: `RefreshTokenRotation.tla` / L5: 8스레드 x 20묶음 동시성 테스트. 조건 제거 음성 확인 완료 | 확정 (TASK-002) |
+| INV-AUTH-002 | 이미 사용된 refresh 토큰이 다시 제출되면, 그 토큰 묶음 전체가 폐기 상태가 된다 | L2, L3, L5 | ADR 0003 | L2: `AuthStateProperties` / L3: `RefreshTokenRotation.tla` / L5: 순차 재사용·동시성 테스트 | 확정 (TASK-002) |
+| INV-AUTH-003 | 비밀번호와 refresh 토큰은 DB에 평문으로 저장되지 않는다 | L2, L4 | ADR 0003 | `SecurityTest`, `AuthStateProperties`, `JdbcAuthStoreTest` | 확정 (TASK-002) |
 | INV-AUTHZ-001 | 보호자는 관계가 등록된 이용자의 데이터에만 접근한다 | L2, L5 | ADR 0004 | - | 제안 |
 | INV-AUTHZ-002 | 다른 기관 리소스에 대한 요청은 항상 404이며, 존재 여부가 응답으로 드러나지 않는다 | L2 | ADR 0004 | - | 제안 |
 | INV-SENS-001 | 민감정보로 지정된 컬럼의 DB 저장값은 항상 암호문이다 | L2, L4 | ADR 0005 | - | 제안 |
 | INV-SENS-002 | 암호화 → 복호화 결과는 항상 원문과 같다 (모든 입력, 모든 키 버전) | L2 | ADR 0005 | - | 제안 |
 | INV-AUDIT-001 | 개인정보 조회·수정·다운로드는 빠짐없이 접속기록을 남긴다 | L2, L5 | ADR 0005 | - | 제안 |
 | INV-AUDIT-002 | 접속기록은 추가만 가능하다 (수정·삭제 불가) | L1(권한/트리거), L5 | ADR 0005 | - | 제안 |
-| INV-API-001 | 모든 에러 응답은 ProblemDetail 형식이며 개인정보를 포함하지 않는다 | L2, L4 | ADR 0006 | - | 제안 |
+| INV-API-001 | 모든 에러 응답은 ProblemDetail 형식이며 개인정보를 포함하지 않는다 | L2, L4 | ADR 0006 | `AuthApiTest`, `SecurityProblemsTest` (인증 오류만) | 부분 확정 (TASK-002: 인증 오류 응답) |
 | INV-API-002 | 같은 Idempotency-Key로 반복된 요청은 부수효과가 한 번만 일어나고 같은 응답을 받는다 | L1(UNIQUE), L3, L5 | ADR 0006 | - | 제안 |
 | INV-API-003 | If-Match 버전이 현재 버전과 다르면 수정은 일어나지 않는다 | L1(버전 컬럼), L2, L5 | ADR 0006 | - | 제안 |
 | INV-API-004 | 페이지네이션 커서는 인코딩 후 디코딩하면 항상 원래 값과 같고, 변조된 커서는 항상 거부된다 | L2, L6 | ADR 0006 | `CursorCodecProperties` (성질 3개 각 1,000회 + 예제 6개), PIT 96% | 확정 (TASK-001) |
