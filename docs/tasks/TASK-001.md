@@ -116,9 +116,44 @@ Spring Boot 프로젝트를 만들고, ADR 0008의 검증 계층(L1~L6)이 **실
 ## 실행 환경 메모
 
 - Windows 11, PowerShell. 로컬 JDK 25: `C:\Program Files\Eclipse Adoptium\jdk-25.0.5.8-hotspot`
-- Docker Desktop 실행 중 (Testcontainers 사용 가능)
-- 네트워크: Gradle 의존성, Gradle 배포판, tla2tools.jar 다운로드에만 사용
+- 네트워크: Gradle 의존성, Gradle 배포판, tla2tools.jar 다운로드에만 사용. Java HTTPS는 되지만 `curl` 은 샌드박스에서 TLS 오류가 난다. 다운로드는 Gradle(또는 Java)로 한다.
+- **Docker는 Codex 샌드박스 안에서 접근할 수 없다.** 그래서:
+  - Docker가 필요한 테스트는 `@Tag("docker")` 를 붙인다.
+  - Gradle 속성 `-PskipDockerTests` 가 있을 때만 `docker` 태그를 제외하도록 `test` 태스크를 설정한다. 기본값(속성 없음)은 전부 실행이다.
+  - `disabledWithoutDocker` 처럼 Docker가 없으면 조용히 건너뛰는 설정은 쓰지 않는다. Docker가 없는데 속성도 없으면 실패해야 한다.
+  - Codex는 `./gradlew check -PskipDockerTests` 로 검증하고, Docker 테스트는 Claude가 리뷰 때 샌드박스 밖에서 실행한다. 보고서에 "Docker 테스트 미실행(리뷰어 실행 필요)"을 명시한다.
+- Gradle 사용자 홈은 기본 위치(`C:\Users\USER\.gradle`)를 쓴다. 쓰기 권한을 추가로 열어 두었다.
 
 ## 리뷰 기록
 
-(리뷰 후 Claude가 추가)
+### 1회차 (2026-10-28, Claude)
+
+샌드박스 밖에서 `./gradlew check pitest tlcCheck` (Docker 포함) 실행 결과: **실패**. 지시서 범위, 보호 경로, 테스트 약화는 문제 없음.
+
+고칠 것:
+
+1. `ApplicationIntegrationTest` 실패. health 응답을 문자열 전체로 비교해서 깨졌다.
+   - 실제 응답: `{"groups":["liveness","readiness"],"status":"UP"}`
+   - 응답을 JSON으로 파싱해서 `status` 필드가 `UP` 인지만 확인한다. 다른 필드가 추가돼도 깨지지 않게 한다.
+   - 이 테스트는 샌드박스에서 실행할 수 없으니, 수정 후 컴파일만 확인하고 보고서에 "리뷰어 재실행 필요"를 적는다.
+2. `CursorCodec` 생성자가 빈 키나 짧은 키를 받는다. 다음 작업에서 키를 설정값으로 주입할 때 실수를 막기 위해:
+   - `null` 이거나 32바이트 미만인 키는 `IllegalArgumentException` 으로 거부한다.
+   - 경계값(31, 32바이트)과 `null` 을 확인하는 예제 테스트를 추가한다. `@Tag("INV-API-004")` 유지.
+   - PIT 점수 80% 이상 유지.
+3. `README.md` "기술 스택 (예정)" 절이 예전 내용이다. ADR 0002 확정 내용으로 바꾼다.
+   - 제목을 "기술 스택"으로, DB 줄을 `PostgreSQL 17 (Flyway 마이그레이션)` 로, Java 줄을 `Java 25, Spring Boot 4.1` 로.
+
+리뷰어가 직접 처리한 것:
+
+- `gradlew` 실행 권한을 git index에 등록 (`git add --chmod=+x gradlew`)
+
+### 2회차 (2026-10-28, Claude)
+
+샌드박스 밖에서 `./gradlew clean check pitest tlcCheck` (Docker 포함) 실행 결과: **통과**.
+
+- 테스트: ApplicationIntegrationTest 1, ArchitectureTest 1, CursorCodecProperties 9. 실패·건너뜀 0
+- PIT: 변이 26개 중 25개 탐지 (96%), 기준 80%
+- TLC: PipelineSmoke 고유 상태 3개, 오류 없음
+- 1회차 지적 3건 모두 반영 확인. 범위 밖 변경, 보호 경로 변경, 테스트 약화 없음
+
+판단: 병합.

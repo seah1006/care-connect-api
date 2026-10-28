@@ -27,8 +27,22 @@
 - [불변식 목록](docs/invariants/INVARIANTS.md): 언제나 참이어야 하는 성질과 검증 위치
 - [작업 방식](CLAUDE.md): 계획·리뷰는 Claude, 구현은 Codex([규칙](AGENTS.md))
 
-## 기술 스택 (예정)
+## 기술 스택
 
-- Java, Spring Boot
-- RDB (MySQL 또는 PostgreSQL, ADR로 결정)
+- Java 25, Spring Boot 4.1
+- PostgreSQL 17 (Flyway 마이그레이션)
 - JWT 인증, 역할 기반 권한
+
+## 개발 환경
+
+- JDK 25를 사용합니다. Gradle toolchain이 없으면 foojay resolver로 자동 다운로드합니다. Wrapper 실행에는 Java 17 이상이 필요합니다.
+- PostgreSQL 통합 테스트에는 실행 중인 Docker가 필요합니다 (`postgres:17-alpine`).
+- 로컬 실행은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` 환경 변수를 설정한 뒤 `./gradlew bootRun`으로 시작합니다.
+
+검증 명령:
+
+- `./gradlew check`: 컴파일, jqwik 성질 테스트, ArchUnit 구조 규칙, 실제 PostgreSQL의 컨텍스트·Flyway·health 통합 테스트를 실행합니다.
+- `./gradlew pitest`: 애플리케이션·설정 클래스를 제외한 코드의 변이 점수가 80% 이상인지 검사합니다.
+- `./gradlew tlcCheck`: 짝이 되는 `.cfg`가 있는 `docs/spec/*.tla`를 TLC로 검사합니다.
+
+전체 검증은 `./gradlew check pitest tlcCheck`로 실행합니다. Docker에 접근할 수 없는 샌드박스에서만 `./gradlew check -PskipDockerTests`를 사용합니다. 기본 실행과 CI는 Docker 테스트도 반드시 실행합니다.
