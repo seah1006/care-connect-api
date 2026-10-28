@@ -116,8 +116,13 @@ Spring Boot 프로젝트를 만들고, ADR 0008의 검증 계층(L1~L6)이 **실
 ## 실행 환경 메모
 
 - Windows 11, PowerShell. 로컬 JDK 25: `C:\Program Files\Eclipse Adoptium\jdk-25.0.5.8-hotspot`
-- Docker Desktop 실행 중 (Testcontainers 사용 가능)
-- 네트워크: Gradle 의존성, Gradle 배포판, tla2tools.jar 다운로드에만 사용
+- 네트워크: Gradle 의존성, Gradle 배포판, tla2tools.jar 다운로드에만 사용. Java HTTPS는 되지만 `curl` 은 샌드박스에서 TLS 오류가 난다. 다운로드는 Gradle(또는 Java)로 한다.
+- **Docker는 Codex 샌드박스 안에서 접근할 수 없다.** 그래서:
+  - Docker가 필요한 테스트는 `@Tag("docker")` 를 붙인다.
+  - Gradle 속성 `-PskipDockerTests` 가 있을 때만 `docker` 태그를 제외하도록 `test` 태스크를 설정한다. 기본값(속성 없음)은 전부 실행이다.
+  - `disabledWithoutDocker` 처럼 Docker가 없으면 조용히 건너뛰는 설정은 쓰지 않는다. Docker가 없는데 속성도 없으면 실패해야 한다.
+  - Codex는 `./gradlew check -PskipDockerTests` 로 검증하고, Docker 테스트는 Claude가 리뷰 때 샌드박스 밖에서 실행한다. 보고서에 "Docker 테스트 미실행(리뷰어 실행 필요)"을 명시한다.
+- Gradle 사용자 홈은 기본 위치(`C:\Users\USER\.gradle`)를 쓴다. 쓰기 권한을 추가로 열어 두었다.
 
 ## 리뷰 기록
 

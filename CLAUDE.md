@@ -85,9 +85,14 @@ codex exec \
   -C "$(git rev-parse --show-toplevel)" \
   -s workspace-write \
   -c sandbox_workspace_write.network_access=true \
+  -c 'windows.sandbox="unelevated"' \
+  --add-dir "$HOME/.gradle" \
   -o .codex-runs/TASK-XXX.last.md \
   - < docs/tasks/TASK-XXX.md
 ```
+
+- 이 PC에서는 Codex의 elevated Windows 샌드박스 초기화가 실패한다(`setup refresh had errors`). 그래서 이 저장소 작업에서만 unelevated 샌드박스를 쓴다. 전역 설정(`~/.codex/config.toml`)은 바꾸지 않는다.
+- unelevated 샌드박스 안에서는 Docker에 접근할 수 없다. Codex는 `./gradlew check -PskipDockerTests` 로 검증하고, `docker` 태그 테스트는 Claude가 리뷰 때 샌드박스 밖에서 실행한다.
 
 - 샌드박스는 `workspace-write`만 쓴다. `danger-full-access`나 승인 우회 옵션은 쓰지 않는다.
 - 네트워크는 Gradle 의존성과 도구 다운로드에 필요해서 켠다. 새 의존성은 지시서에 적힌 것만 허용한다 (AGENTS.md).

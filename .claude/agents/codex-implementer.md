@@ -27,6 +27,8 @@ model: sonnet
      -C "$(git rev-parse --show-toplevel)" \
      -s workspace-write \
      -c sandbox_workspace_write.network_access=true \
+     -c 'windows.sandbox="unelevated"' \
+     --add-dir "$HOME/.gradle" \
      -o ".codex-runs/<작업ID>.last.md" \
      - < "docs/tasks/<작업ID>.md"
    ```
