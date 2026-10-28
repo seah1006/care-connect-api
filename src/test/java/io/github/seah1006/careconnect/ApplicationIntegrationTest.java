@@ -6,11 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
@@ -21,12 +17,9 @@ import java.net.http.HttpResponse;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("docker")
-@Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class ApplicationIntegrationTest {
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17-alpine");
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "spring.flyway.locations=classpath:db/migration,classpath:db/testmigration")
+class ApplicationIntegrationTest extends PostgresSupport {
 
     @Autowired
     Flyway flyway;
@@ -42,10 +35,12 @@ class ApplicationIntegrationTest {
 
     @Test
     void contextStartsWithPostgresBaselineMigrationAndHealthyHttpEndpoint() throws Exception {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9000");
         assertThat(flyway.info().pending()).isEmpty();
         assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history where version = '1' and success",
                 Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history where version in ('2', '9000') and success",
+                Integer.class)).isEqualTo(2);
         try (HttpClient client = HttpClient.newHttpClient()) {
             HttpResponse<String> response = client.send(HttpRequest.newBuilder(
                     URI.create("http://localhost:" + port + "/actuator/health")).GET().build(),
