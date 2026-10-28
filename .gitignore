@@ -1,0 +1,32 @@
+# Gradle / Maven
+.gradle/
+build/
+target/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+bin/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.properties
+*.pem
+*.key
+
+# Real data must never be committed
+data/real/
+*.hwp
