@@ -1,6 +1,6 @@
 # 0002. 기술 스택과 DB: Spring Boot + PostgreSQL
 
-- 상태: 제안
+- 상태: 확정 (2026-10-28)
 - 날짜: 2026-10-28
 
 ## 맥락
@@ -18,8 +18,8 @@ DB는 멀티테넌트 격리(0001), 민감정보 보호(0005), 동의 기록 같
 
 ## 결정
 
-- Java LTS 버전(21 또는 25)과 Spring Boot 최신 안정 버전. 정확한 버전은 프로젝트를 생성할 때 확정하고 이 문서에 적는다.
-- 빌드: Gradle (Kotlin DSL), JDK는 Gradle toolchain으로 고정
+- **Java 25 (LTS)** 와 Spring Boot 최신 안정 버전. Spring Boot 정확한 버전은 프로젝트를 생성할 때 이 문서에 적는다.
+- 빌드: Gradle (Kotlin DSL). JDK는 Gradle toolchain으로 25에 고정하고, 없으면 자동으로 내려받게 한다(foojay toolchain resolver). 개발자 PC에 어떤 JDK가 깔려 있든 빌드 결과가 같아야 하기 때문이다.
 - DB: **PostgreSQL**
   - 0001의 2차 방어선인 행 수준 보안을 DB가 직접 지원한다.
   - "대기 중인 신청만" 같은 조건부 인덱스(부분 인덱스)로 대기열 조회를 가볍게 만들 수 있다.
@@ -31,7 +31,7 @@ DB는 멀티테넌트 격리(0001), 민감정보 보호(0005), 동의 기록 같
 ## 결과
 
 - 얻는 것: 격리와 보안 요구를 DB 기능으로 함께 해결한다. Testcontainers로 운영과 같은 DB에서 테스트한다.
-- 감수하는 것: PostgreSQL 학습 비용. 로컬 PC의 JDK(현재 26, LTS 아님)와 프로젝트 JDK가 다르므로 toolchain 설정이 필요하다.
+- 감수하는 것: PostgreSQL 학습 비용. 개발 PC 기본 JDK(26, LTS 아님)는 그대로 두고, 프로젝트는 toolchain으로 25를 쓴다. IDE도 프로젝트 SDK를 25로 맞춰야 한다.
 
 ## 다시 볼 조건
 
