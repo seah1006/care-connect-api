@@ -51,7 +51,6 @@ class ApplicationIntegrationTest {
         final PasswordEncoder passwords;
 
         Database() {
-            POSTGRES.start();
             Map<String, Object> settings = new HashMap<>();
             properties(settings::put);
             settings.put("spring.flyway.locations", "classpath:db/migration,classpath:db/testmigration");
@@ -67,7 +66,7 @@ class ApplicationIntegrationTest {
             tx = new TransactionTemplate(context.getBean("identityTransactionManager", PlatformTransactionManager.class));
             jpaTx = new TransactionTemplate(context.getBean("transactionManager", PlatformTransactionManager.class));
             emf = context.getBean(EntityManagerFactory.class);
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> { context.close(); POSTGRES.stop(); }));
+            Runtime.getRuntime().addShutdownHook(new Thread(context::close));
         }
 
         UUID organization() {

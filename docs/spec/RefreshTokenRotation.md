@@ -39,3 +39,9 @@
 ```
 
 반례를 직접 보려면 `.cfg`를 복사해 `UseCAS = FALSE`로 바꾼 뒤 TLC를 실행한다 (저장소의 `.cfg`는 TRUE로 유지).
+
+## 구현 대응 확인 (2026-10-28, TASK-002)
+
+- 구현: `AuthService.refresh` + `JdbcAuthStore.markUsed` (조건부 UPDATE, 묶음 단위 advisory lock 추가)
+- L5: 8개 스레드가 같은 토큰으로 동시에 refresh, 20개 묶음 반복. 통과
+- 음성 확인: `AND status='ACTIVE'` 를 빼면 동시성 테스트와 순차 재사용 테스트가 실패하고, DB 유니크 인덱스 `refresh_token_single_active` 가 두 번째 ACTIVE 토큰 삽입을 거부했다. 모델의 `UseCAS = FALSE` 반례가 실제 코드에서도 재현되고, L1(DB 제약)이 마지막 방어선으로 동작함을 확인

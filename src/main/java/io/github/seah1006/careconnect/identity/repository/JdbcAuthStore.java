@@ -64,7 +64,8 @@ public class JdbcAuthStore implements AuthStore {
 
     @Override
     public int markUsed(UUID id, Instant now) {
-        return jdbc.update("UPDATE refresh_token SET status='USED', used_at=now() WHERE id=? AND status='ACTIVE'", id);
+        return jdbc.update("UPDATE refresh_token SET status='USED', used_at=? WHERE id=? AND status='ACTIVE'",
+                Timestamp.from(now), id);
     }
 
     @Override

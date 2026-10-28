@@ -155,3 +155,15 @@ TLA+ 모델(`docs/spec/RefreshTokenRotation.tla`)과 같은 규칙으로 동작�
    - 첫 번째 `ApplicationIntegrationTest` (루트 패키지)도 같은 지원 클래스를 쓰도록 맞춘다.
    - 샌드박스에서는 실행할 수 없으니 컴파일까지 확인하고 "리뷰어 재실행 필요"를 적는다.
 2. `JdbcAuthStore.markUsed(id, now)` 가 `now` 를 쓰지 않고 DB `now()` 를 쓴다. 다른 시각은 모두 주입된 `Clock` 을 따르므로 `used_at` 도 인자로 받은 시각을 쓴다. 조건부 UPDATE의 `AND status='ACTIVE'` 는 그대로 유지.
+
+### 2회차 (2026-10-28, Claude)
+
+샌드박스 밖에서 `./gradlew clean check pitest tlcCheck` (Docker 포함): **통과**.
+
+- 테스트 41개 전부 통과 (Docker 통합 테스트 9개 포함)
+- PIT: 변이 100개 중 90개 탐지 (90%), 기준 80%
+- TLC: PipelineSmoke, RefreshTokenRotation(고유 상태 160개) 위반 없음
+- 리뷰어 음성 확인: `AND status='ACTIVE'` 제거 시 `eightConcurrentRefreshesFollowUseCasTrueForTwentyFamilies`, `sequentialReuseCommitsRevocationBeforeReturningFailure`, `JdbcAuthStoreTest` 실패. DB 유니크 인덱스가 두 번째 ACTIVE 토큰 삽입을 거부. 원복 확인
+- 1회차 지적 2건 반영 확인. 범위 밖 변경, 보호 경로 변경, 테스트 약화 없음
+
+판단: 병합.

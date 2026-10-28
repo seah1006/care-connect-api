@@ -41,10 +41,11 @@ class JdbcAuthStoreTest {
     }
 
     @Test void compareAndSetAndFamilyOperationsReachDatabase() {
-        String cas = "UPDATE refresh_token SET status='USED', used_at=now() WHERE id=? AND status='ACTIVE'";
-        when(jdbc.update(cas, id)).thenReturn(1, 0);
+        String cas = "UPDATE refresh_token SET status='USED', used_at=? WHERE id=? AND status='ACTIVE'";
+        when(jdbc.update(cas, Timestamp.from(now), id)).thenReturn(1, 0);
         assertThat(store.markUsed(id, now)).isEqualTo(1);
         assertThat(store.markUsed(id, now)).isZero();
+        verify(jdbc, times(2)).update(cas, Timestamp.from(now), id);
         when(jdbc.queryForObject("select status from refresh_token where id = ?", String.class, id)).thenReturn("USED");
         assertThat(store.status(id)).isEqualTo(RefreshToken.Status.USED);
         store.lockFamily(family);
