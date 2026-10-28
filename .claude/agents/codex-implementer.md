@@ -26,11 +26,13 @@ model: sonnet
    codex exec \
      -C "$(git rev-parse --show-toplevel)" \
      -s workspace-write \
+     -c sandbox_workspace_write.network_access=true \
      -o ".codex-runs/<작업ID>.last.md" \
      - < "docs/tasks/<작업ID>.md"
    ```
 
    - `danger-full-access`, `--dangerously-bypass-approvals-and-sandbox`, `--approve-for-me` 는 절대 쓰지 않는다.
+   - 실행 전에 `JAVA_HOME` 이 JDK 25를 가리키는지 확인한다. 아니면 이 프로세스에서만 25로 바꾼다.
    - 실행이 실패하면 오류 메시지를 그대로 보고한다. 재시도는 한 번까지만 한다.
 
 3. 결과 수집

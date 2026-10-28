@@ -84,11 +84,14 @@
 codex exec \
   -C "$(git rev-parse --show-toplevel)" \
   -s workspace-write \
+  -c sandbox_workspace_write.network_access=true \
   -o .codex-runs/TASK-XXX.last.md \
   - < docs/tasks/TASK-XXX.md
 ```
 
 - 샌드박스는 `workspace-write`만 쓴다. `danger-full-access`나 승인 우회 옵션은 쓰지 않는다.
+- 네트워크는 Gradle 의존성과 도구 다운로드에 필요해서 켠다. 새 의존성은 지시서에 적힌 것만 허용한다 (AGENTS.md).
+- Codex 프로세스의 `JAVA_HOME` 은 JDK 25로 맞춘다. 개발 PC의 사용자 `JAVA_HOME` 은 26을 가리키고 있다.
 - 결과 보고는 `.codex-runs/TASK-XXX.last.md`에 남고, 서브에이전트가 요약해서 돌려준다.
 - 리뷰 단계에서 두 번째 의견이 필요하면 `codex exec review`를 참고용으로 쓸 수 있다. 최종 판단은 Claude가 한다.
 
@@ -98,8 +101,8 @@ codex exec \
 
 ```bash
 ./gradlew check                 # 컴파일, 단위·성질 테스트(jqwik), ArchUnit, 통합 테스트
-./gradlew pitest                # 변이 테스트 (도메인 패키지 기준 점수 미달 시 실패)
-./scripts/tlc-check.sh          # docs/spec/*.tla 전부 TLC로 검사
+./gradlew pitest                # 변이 테스트 (점수 80% 미달 시 실패)
+./gradlew tlcCheck              # docs/spec/*.tla 전부 TLC로 검사
 ```
 
 하나라도 실패하면 병합하지 않는다. "나중에 고치기"로 넘기지 않는다.
