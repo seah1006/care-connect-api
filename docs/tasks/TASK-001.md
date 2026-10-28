@@ -126,4 +126,23 @@ Spring Boot 프로젝트를 만들고, ADR 0008의 검증 계층(L1~L6)이 **실
 
 ## 리뷰 기록
 
-(리뷰 후 Claude가 추가)
+### 1회차 (2026-10-28, Claude)
+
+샌드박스 밖에서 `./gradlew check pitest tlcCheck` (Docker 포함) 실행 결과: **실패**. 지시서 범위, 보호 경로, 테스트 약화는 문제 없음.
+
+고칠 것:
+
+1. `ApplicationIntegrationTest` 실패. health 응답을 문자열 전체로 비교해서 깨졌다.
+   - 실제 응답: `{"groups":["liveness","readiness"],"status":"UP"}`
+   - 응답을 JSON으로 파싱해서 `status` 필드가 `UP` 인지만 확인한다. 다른 필드가 추가돼도 깨지지 않게 한다.
+   - 이 테스트는 샌드박스에서 실행할 수 없으니, 수정 후 컴파일만 확인하고 보고서에 "리뷰어 재실행 필요"를 적는다.
+2. `CursorCodec` 생성자가 빈 키나 짧은 키를 받는다. 다음 작업에서 키를 설정값으로 주입할 때 실수를 막기 위해:
+   - `null` 이거나 32바이트 미만인 키는 `IllegalArgumentException` 으로 거부한다.
+   - 경계값(31, 32바이트)과 `null` 을 확인하는 예제 테스트를 추가한다. `@Tag("INV-API-004")` 유지.
+   - PIT 점수 80% 이상 유지.
+3. `README.md` "기술 스택 (예정)" 절이 예전 내용이다. ADR 0002 확정 내용으로 바꾼다.
+   - 제목을 "기술 스택"으로, DB 줄을 `PostgreSQL 17 (Flyway 마이그레이션)` 로, Java 줄을 `Java 25, Spring Boot 4.1` 로.
+
+리뷰어가 직접 처리한 것:
+
+- `gradlew` 실행 권한을 git index에 등록 (`git add --chmod=+x gradlew`)

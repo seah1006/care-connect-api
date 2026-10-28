@@ -1,0 +1,1 @@
+-- Baseline only. Domain tables and extensions belong to subsequent tasks.
