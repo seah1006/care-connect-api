@@ -32,9 +32,13 @@ class ParticipantAuditProperties {
     static class MemoryLog implements AccessLog {
         final List<AccessEvent> events = new ArrayList<>();
         int remaining = Integer.MAX_VALUE;
-        @Override public void record(AccessEvent event) {
-            if (remaining-- <= 0) throw new DataAccessResourceFailureException("synthetic-internal-error");
-            events.add(event);
+        int batches;
+        @Override public void recordAll(List<AccessEvent> batch) {
+            batches++;
+            for (var event : batch) {
+                if (remaining-- <= 0) throw new DataAccessResourceFailureException("synthetic-internal-error");
+            }
+            events.addAll(batch);
         }
     }
 
@@ -71,6 +75,7 @@ class ParticipantAuditProperties {
             }
             assertThat(log.events).containsExactly(new AccessEvent(actor.orgId(), actor.userId(), READ, "participant", id, outcome));
             log.events.clear();
+            log.batches = 0;
             if (role == 0) {
                 assertThatThrownBy(() -> service.list(null, 3)).isInstanceOf(AccessDenied.class);
                 assertThat(log.events).containsExactly(new AccessEvent(actor.orgId(), actor.userId(), LIST, "participant", null, DENIED));
@@ -84,6 +89,8 @@ class ParticipantAuditProperties {
                 assertThat(log.events).containsExactlyElementsOf(events.isEmpty()
                         ? List.of(new AccessEvent(actor.orgId(), actor.userId(), LIST, "participant", null, ALLOWED)) : events);
             }
+            assertThat(log.batches).isEqualTo(1);
+            log.events.clear();
             log.remaining = 0;
             assertThatThrownBy(() -> service.get(id)).isInstanceOf(DataAccessResourceFailureException.class);
             assertThatThrownBy(() -> service.list(null, 3)).isInstanceOf(DataAccessResourceFailureException.class);
@@ -91,6 +98,7 @@ class ParticipantAuditProperties {
                 log.remaining = 1;
                 assertThatThrownBy(() -> service.list(null, 3)).isInstanceOf(DataAccessResourceFailureException.class);
             }
+            assertThat(log.events).isEmpty();
             log.remaining = Integer.MAX_VALUE;
         }
     }

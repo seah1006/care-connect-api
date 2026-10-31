@@ -355,6 +355,25 @@ class ApplicationIntegrationTest {
         d.get(token, "", 200);
     }
 
+    @Test @Tag("INV-AUDIT-001") @Tag("INV-AUDIT-003")
+    void failedRowInListBatchRollsBackEveryRecordAndReturnsNoParticipantData() throws Exception {
+        Database d = db();
+        UUID org = d.org(false), user = d.user(org, StaffRole.ORG_ADMIN);
+        var participants = List.of(d.participant(org, null), d.participant(org, null)).stream()
+                .sorted(Comparator.comparing(UUID::toString)).toList();
+        String token = d.tokens.issue(user, org, StaffRole.ORG_ADMIN);
+        d.owner.execute("alter table access_log add constraint synthetic_batch_failure check (resource_id <> '"
+                + participants.getLast() + "'::uuid) not valid");
+        try {
+            d.get(token, "", 500);
+            assertThat(d.scoped(org, () -> d.jdbc.queryForObject(
+                    "select count(*) from access_log where actor_user_id=?", Integer.class, user))).isZero();
+        } finally {
+            d.owner.execute("alter table access_log drop constraint synthetic_batch_failure");
+        }
+        d.get(token, "", 200);
+    }
+
     @Test @Tag("INV-SENS-003")
     void rawDatabaseCiphertextHidesPlaintextAndCannotBeCopiedToAnotherRow() {
         Database d = db(); UUID org = d.org(false), first = UUID.randomUUID(), second = UUID.randomUUID();

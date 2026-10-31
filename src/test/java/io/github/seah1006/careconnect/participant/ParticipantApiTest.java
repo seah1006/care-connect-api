@@ -137,6 +137,9 @@ class ParticipantApiTest {
         when(REPOSITORY.list(ORG, true, Set.of(), null, 21)).thenReturn(List.of(new ParticipantView(id, "synthetic-private-name", null)));
         doThrow(new org.springframework.dao.DataAccessResourceFailureException("synthetic-internal-error"))
                 .when(AUDIT).record(any());
+        doThrow(new org.springframework.dao.DataAccessResourceFailureException("Access recording failed",
+                new IllegalStateException("synthetic-internal-error")))
+                .when(AUDIT).recordAll(anyList());
         try {
             for (String suffix : List.of("/" + id, "")) {
                 String body = request(suffix, 500).getContentAsString();

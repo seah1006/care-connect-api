@@ -53,14 +53,16 @@ public class ParticipantService {
         }
         var facts = repository.facts(actor);
         if (facts.role() == null) {
-            record(actor, LIST, null, DENIED);
+            accessLog.recordAll(List.of(new AccessEvent(actor.orgId(), actor.userId(), LIST, "participant", null, DENIED)));
             throw new AccessDenied();
         }
         var rows = repository.list(actor.orgId(), AccessPolicy.permits(facts, null), facts.assignedGroups(), after, size + 1);
         boolean more = rows.size() > size;
         var items = List.copyOf(more ? rows.subList(0, size) : rows);
-        if (items.isEmpty()) record(actor, LIST, null, ALLOWED);
-        else items.forEach(item -> record(actor, LIST, item.id(), ALLOWED));
+        accessLog.recordAll(items.isEmpty()
+                ? List.of(new AccessEvent(actor.orgId(), actor.userId(), LIST, "participant", null, ALLOWED))
+                : items.stream().map(item -> new AccessEvent(actor.orgId(), actor.userId(), LIST,
+                        "participant", item.id(), ALLOWED)).toList());
         return new Page(items, more ? cursors.encode(new Cursor(CURSOR_KIND, items.getLast().id())) : null);
     }
 

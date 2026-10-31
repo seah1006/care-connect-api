@@ -10,6 +10,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -21,12 +25,19 @@ import tools.jackson.databind.ObjectMapper;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
     private final ObjectMapper mapper;
 
     public ApiExceptionHandler(ObjectMapper mapper) { this.mapper = mapper; }
 
-    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
-    public void storageFailure(HttpServletResponse response) throws IOException {
+    @ExceptionHandler(DataAccessException.class)
+    public void storageFailure(DataAccessException failure, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        UUID requestId = (UUID) request.getAttribute("requestId");
+        if (requestId == null) {
+            requestId = UUID.randomUUID();
+            request.setAttribute("requestId", requestId);
+        }
+        log.error("Storage failure: exception={} requestId={}", failure.getMostSpecificCause().getClass().getName(), requestId);
         SecurityProblems.write(mapper, response, HttpStatus.INTERNAL_SERVER_ERROR, "Request failed");
     }
 

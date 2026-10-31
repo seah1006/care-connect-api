@@ -187,3 +187,17 @@ Claude가 리뷰 후 지적 사항을 회차별로 추가한다.
    - 수정: 새 예외에 원래 예외를 `cause` 로 붙인다. `storageFailure` 는 서버 로그에 `ERROR` 로 남긴다 (예외 종류와 요청 ID만. 요청 경로의 ID, 이용자 정보, SQL 파라미터는 남기지 않는다). 응답 본문은 지금처럼 일반 문구만.
    - 테스트: 응답 본문에 원래 예외 메시지가 나오지 않는 기존 검증 유지.
    - 범위: `common/audit/**`, `common/web/ApiExceptionHandler.java`, `participant/application/**`, `src/test/**`.
+### 2회차 (2026-10-31, Claude)
+
+샌드박스 밖에서 `./gradlew clean check pitest tlcCheck` (Docker 포함): **통과**.
+
+- 테스트 81개 전부 통과
+- PIT: 변이 212개 중 202개 탐지 (95%), 기준 80%
+- TLC: 두 모델 위반 없음
+- 1회차 지적 2건 반영 확인
+  - 목록 기록은 `recordAll` 한 번, `REQUIRES_NEW` 트랜잭션 한 번, 배치 insert 한 번 (`JdbcAccessLogTest` 가 횟수 검증). 배치 중간 실패 시 0행·데이터 미응답 (L5)
+  - 기록 실패 원인을 `cause` 로 보존, 서버 로그에는 예외 종류와 요청 ID만 `ERROR` 로 남김. 응답 본문은 일반 문구
+- 기존 테스트 변경은 `update` → `batchUpdate` 대역 교체와 `hasNoCause` → `hasCauseReference` (요구사항 변경에 따른 것)뿐. 약화 없음
+- 참고 (이번 범위 밖): 기록이 별도 트랜잭션이라 조회 요청 하나가 DB 연결을 두 개 쓴다. 부하 테스트(7주차) 때 연결 풀 크기와 함께 확인한다
+
+판단: 병합 (사용자 승인 후).

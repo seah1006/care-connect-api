@@ -3,6 +3,7 @@ package io.github.seah1006.careconnect.common.audit;
 import io.github.seah1006.careconnect.common.tenancy.TenantContext;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -16,7 +17,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Component
 public class JdbcAccessLog implements AccessLog {
-    private static final String REQUEST_ID = JdbcAccessLog.class.getName() + ".requestId";
+    private static final String REQUEST_ID = "requestId";
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final TransactionTemplate transaction;
@@ -30,7 +31,8 @@ public class JdbcAccessLog implements AccessLog {
     }
 
     @Override
-    public void record(AccessEvent event) {
+    public void recordAll(List<AccessEvent> events) {
+        if (events.isEmpty()) return;
         try {
             UUID requestId;
             String ip = null;
@@ -47,17 +49,18 @@ public class JdbcAccessLog implements AccessLog {
             }
             UUID id = requestId;
             String clientIp = ip;
-            TenantContext.callAs(event.orgId(), () -> {
-                transaction.executeWithoutResult(status -> jdbc.update("""
+            TenantContext.callAs(events.getFirst().orgId(), () -> {
+                transaction.executeWithoutResult(status -> jdbc.batchUpdate("""
                         insert into access_log(id, org_id, actor_user_id, action, resource_type, resource_id,
                             outcome, occurred_at, client_ip, request_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, UUID.randomUUID(), event.orgId(), event.actorUserId(), event.action().name(),
+                        """, events.stream().map(event -> new Object[] {
+                        UUID.randomUUID(), event.orgId(), event.actorUserId(), event.action().name(),
                         event.resourceType(), event.resourceId(), event.outcome().name(),
-                        Timestamp.from(clock.instant()), clientIp, id));
+                        Timestamp.from(clock.instant()), clientIp, id }).toList()));
                 return null;
             });
         } catch (RuntimeException failure) {
-            throw new DataAccessResourceFailureException("Access recording failed");
+            throw new DataAccessResourceFailureException("Access recording failed", failure);
         }
     }
 }
