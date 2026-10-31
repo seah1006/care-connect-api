@@ -23,7 +23,7 @@ public final class SecurityProblems {
         return (request, response, exception) -> write(mapper, response, HttpStatus.FORBIDDEN, "Access denied");
     }
 
-    private static void write(ObjectMapper mapper, HttpServletResponse response, HttpStatus status, String detail)
+    static void write(ObjectMapper mapper, HttpServletResponse response, HttpStatus status, String detail)
             throws IOException {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);

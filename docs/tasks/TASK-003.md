@@ -155,3 +155,37 @@
 ## 리뷰 기록
 
 Claude가 리뷰 후 지적 사항을 회차별로 추가한다.
+
+### 1회차 (2026-10-31, Claude)
+
+샌드박스 밖에서 `./gradlew clean check pitest tlcCheck` (Docker 포함): **통과**.
+
+- PIT: 변이 141개 중 131개 탐지 (93%), 기준 80%
+- TLC: PipelineSmoke, RefreshTokenRotation 위반 없음
+- 범위, 보호 경로, 테스트 삭제·약화 문제 없음
+- 리뷰어 음성 확인 (Docker, 모두 원복):
+  1. 목록 범위 조건 `group_id in (:groups)` 를 `true` 로 → `twentyRandomLayouts...`, `sameTokenTracks...` 실패
+  2. 담당 배정의 복합 FK `(group_id, org_id)` 를 단일 FK `(group_id)` 로 → `compositeForeignKeys...` 실패
+  3. DB 역할 대신 항상 `STAFF` → `twentyRandomLayouts...`, `sameTokenTracks...` 실패
+  4. 소속이 없어도 `STAFF` 로 취급 → `sameTokenTracks...` 실패
+
+고칠 것:
+
+1. **커서 서명 키가 JWT 서명 키와 같다**
+   - `ParticipantConfiguration.participantCursorCodec(SecretKey key)` 가 access 토큰 서명 키(`jwtKey`)를 그대로 `CursorCodec` 에 넣는다. 용도가 다른 서명에 같은 키를 쓰면 한쪽 형식 변경이 다른 쪽 위조 가능성으로 이어질 수 있다 (키 분리 원칙).
+   - 수정: `common.pagination` 에 커서 키 설정을 둔다. 커서 키 = `HMAC-SHA256(jwtKey, "care-connect/cursor/v1")` 로 파생한다 (새 환경 변수 없이 분리). `ParticipantConfiguration` 의 빈은 이 파생 키를 쓰는 공통 `CursorCodec` 빈으로 바꾸고, 참가자 모듈 전용 설정은 지운다.
+   - 테스트: (a) 파생 키가 JWT 키와 다르다, (b) JWT 키로 직접 서명한 커서는 목록 API에서 422로 거부된다, (c) 파생 키로 만든 커서는 그대로 동작한다. 기존 `CursorCodecProperties` 는 바꾸지 않는다.
+   - 범위: `common/pagination/**` (새 설정 클래스), `participant/application/ParticipantConfiguration.java` (삭제 허용), `src/test/**`.
+
+### 2회차 (2026-10-31, Claude)
+
+샌드박스 밖에서 `./gradlew clean check pitest tlcCheck` (Docker 포함): **통과**.
+
+- 테스트 58개 전부 통과 (TASK-002 41개 → 58개)
+- PIT: 변이 141개 중 131개 탐지 (93%), 기준 80%
+- TLC: 두 모델 위반 없음
+- 커서 키 분리 반영 확인: `common.pagination.CursorConfiguration` 이 `HMAC-SHA256(jwtKey, "care-connect/cursor/v1")` 로 파생한 키를 쓴다. JWT 키로 서명한 커서는 422로 거부된다
+- 키 분리 전 커서는 더 이상 받지 않지만, 아직 배포 전이라 영향 없음
+- 범위 밖 변경, 보호 경로 변경, 테스트 약화 없음
+
+판단: 병합 (사용자 승인 후).

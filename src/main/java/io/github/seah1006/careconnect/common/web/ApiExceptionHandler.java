@@ -3,6 +3,9 @@ package io.github.seah1006.careconnect.common.web;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
+import io.github.seah1006.careconnect.common.authz.AccessDenied;
+import io.github.seah1006.careconnect.common.authz.ResourceNotFound;
+import io.github.seah1006.careconnect.common.pagination.InvalidCursorException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +24,23 @@ public class ApiExceptionHandler {
     private final ObjectMapper mapper;
 
     public ApiExceptionHandler(ObjectMapper mapper) { this.mapper = mapper; }
+
+    @ExceptionHandler(AccessDenied.class)
+    public void forbidden(HttpServletResponse response) throws IOException {
+        SecurityProblems.write(mapper, response, HttpStatus.FORBIDDEN, "Access denied");
+    }
+
+    @ExceptionHandler(ResourceNotFound.class)
+    public void notFound(HttpServletResponse response) throws IOException {
+        // Write directly so Spring cannot insert the requested resource URI as instance.
+        SecurityProblems.write(mapper, response, HttpStatus.NOT_FOUND, "Resource not found");
+    }
+
+    @ExceptionHandler({InvalidCursorException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
+    public void invalidPagination(HttpServletResponse response) throws IOException {
+        SecurityProblems.write(mapper, response, HttpStatus.UNPROCESSABLE_ENTITY, "Invalid request");
+    }
 
     @ExceptionHandler(AuthenticationException.class)
     public void unauthorized(AuthenticationException failure, HttpServletRequest request, HttpServletResponse response)
