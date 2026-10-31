@@ -26,8 +26,11 @@ L1 DB 제약 · L2 성질 기반 테스트(jqwik) · L3 모델 검사(TLA+/TLC) 
 | INV-AUTH-001 | 하나의 refresh 토큰은 최대 한 번만 새 토큰으로 교환된다 (한 묶음에 살아 있는 토큰은 최대 하나) | L1(UNIQUE/상태), L3, L5 | ADR 0003 | L1: 유니크 인덱스 `refresh_token_single_active`, `refresh_token_single_child` / L3: `RefreshTokenRotation.tla` / L5: 8스레드 x 20묶음 동시성 테스트. 조건 제거 음성 확인 완료 | 확정 (TASK-002) |
 | INV-AUTH-002 | 이미 사용된 refresh 토큰이 다시 제출되면, 그 토큰 묶음 전체가 폐기 상태가 된다 | L2, L3, L5 | ADR 0003 | L2: `AuthStateProperties` / L3: `RefreshTokenRotation.tla` / L5: 순차 재사용·동시성 테스트 | 확정 (TASK-002) |
 | INV-AUTH-003 | 비밀번호와 refresh 토큰은 DB에 평문으로 저장되지 않는다 | L2, L4 | ADR 0003 | `SecurityTest`, `AuthStateProperties`, `JdbcAuthStoreTest` | 확정 (TASK-002) |
-| INV-AUTHZ-001 | 보호자는 관계가 등록된 이용자의 데이터에만 접근한다 | L2, L5 | ADR 0004 | - | 제안 |
-| INV-AUTHZ-002 | 다른 기관 리소스에 대한 요청은 항상 404이며, 존재 여부가 응답으로 드러나지 않는다 | L2 | ADR 0004 | - | 제안 |
+| INV-AUTHZ-001 | 보호자는 관계가 등록된 이용자의 데이터에만 접근한다 | L2, L5 | ADR 0004 | - | 제안 (보호자 인증 작업에서 함께 진행. TASK-003 범위 밖) |
+| INV-AUTHZ-002 | 다른 기관 리소스에 대한 요청은 항상 404이며, 존재 여부가 응답으로 드러나지 않는다 | L2, L5 | ADR 0004 | - | 제안 (TASK-003) |
+| INV-AUTHZ-003 | 기관 관리자는 자기 기관 이용자 전체를, 종사자는 담당 그룹 이용자만 조회한다 (기관 설정 `staff_view_all` 이 켜진 경우 종사자도 전체). 목록 결과와 단건 판단은 같은 정책을 따른다 | L2, L5 | ADR 0004 | - | 제안 (TASK-003) |
+| INV-AUTHZ-004 | 담당 배정과 이용자 그룹은 같은 기관 안에서만 연결된다 (다른 기관 그룹·비소속 직원 배정 불가) | L1(복합 FK), L5 | ADR 0001, 0004 | - | 제안 (TASK-003) |
+| INV-AUTHZ-005 | 권한 판단은 access 토큰 클레임이 아니라 요청 시점의 DB 소속·배정을 기준으로 한다 (배정·역할·소속 변경이 다음 요청부터 반영) | L5 | ADR 0004 | - | 제안 (TASK-003) |
 | INV-SENS-001 | 민감정보로 지정된 컬럼의 DB 저장값은 항상 암호문이다 | L2, L4 | ADR 0005 | - | 제안 |
 | INV-SENS-002 | 암호화 → 복호화 결과는 항상 원문과 같다 (모든 입력, 모든 키 버전) | L2 | ADR 0005 | - | 제안 |
 | INV-AUDIT-001 | 개인정보 조회·수정·다운로드는 빠짐없이 접속기록을 남긴다 | L2, L5 | ADR 0005 | - | 제안 |

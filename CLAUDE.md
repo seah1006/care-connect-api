@@ -94,6 +94,7 @@ codex exec \
 - 이 PC에서는 Codex의 elevated Windows 샌드박스 초기화가 실패한다(`setup refresh had errors`). 그래서 이 저장소 작업에서만 unelevated 샌드박스를 쓴다. 전역 설정(`~/.codex/config.toml`)은 바꾸지 않는다.
 - unelevated 샌드박스 안에서는 Docker에 접근할 수 없다. Codex는 `./gradlew check -PskipDockerTests` 로 검증하고, `docker` 태그 테스트는 Claude가 리뷰 때 샌드박스 밖에서 실행한다.
 
+- 저장소는 영문 경로에 둔다. 경로에 한글이 있으면 PIT가 테스트를 하나도 찾지 못해 0%로 실패한다 (2026-10-31, 정션으로도 우회 안 됨).
 - 샌드박스는 `workspace-write`만 쓴다. `danger-full-access`나 승인 우회 옵션은 쓰지 않는다.
 - 네트워크는 Gradle 의존성과 도구 다운로드에 필요해서 켠다. 새 의존성은 지시서에 적힌 것만 허용한다 (AGENTS.md).
 - Codex 프로세스의 `JAVA_HOME` 은 JDK 25로 맞춘다. 개발 PC의 사용자 `JAVA_HOME` 은 26을 가리키고 있다.
