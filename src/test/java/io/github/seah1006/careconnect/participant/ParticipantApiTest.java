@@ -35,22 +35,24 @@ class ParticipantApiTest {
     static final Actor ACTOR = new Actor(USER, ORG);
     static final String TOKEN = SECURITY.access.issue(USER, ORG, StaffRole.ORG_ADMIN);
     static final ParticipantRepository REPOSITORY = mock(ParticipantRepository.class);
-    static final CursorCodec CURSORS = new CursorCodec(new byte[32]);
+    static final CursorCodec CURSORS;
     static final MockMvc MVC;
     static {
         var context = new AnnotationConfigWebApplicationContext();
         context.setServletContext(new MockServletContext());
         context.register(WebConfig.class);
         context.refresh();
+        CURSORS = context.getBean(CursorCodec.class);
         MVC = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
     @org.springframework.boot.test.context.TestConfiguration @EnableWebMvc @EnableWebSecurity
-    @Import({SecurityConfiguration.class, ParticipantController.class, ApiExceptionHandler.class})
+    @Import({SecurityConfiguration.class, ParticipantController.class, ApiExceptionHandler.class, CursorConfiguration.class})
     static class WebConfig {
         @Bean ObjectMapper objectMapper() { return JsonMapper.builder().build(); }
         @Bean org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder() { return SECURITY.decoder; }
-        @Bean ParticipantService service() { return new ParticipantService(new CurrentActor(), REPOSITORY, CURSORS); }
+        @Bean javax.crypto.SecretKey jwtKey() { return SECURITY.key; }
+        @Bean ParticipantService service(CursorCodec cursors) { return new ParticipantService(new CurrentActor(), REPOSITORY, cursors); }
     }
 
     @Provide Arbitrary<String> names() {
@@ -109,6 +111,20 @@ class ParticipantApiTest {
         request("", 200);
         when(REPOSITORY.facts(ACTOR)).thenReturn(new AccessPolicy.Facts(null, Set.of(), false));
         request("/" + first, 403);
+    }
+
+    @Test @org.junit.jupiter.api.Tag("INV-API-004")
+    void listRejectsJwtSignedCursorsAndAcceptsDerivedKeyCursors() throws Exception {
+        reset(REPOSITORY);
+        var cursor = new Cursor("participants:id", UUID.randomUUID());
+        String jwtSigned = new CursorCodec(SECURITY.key.getEncoded()).encode(cursor);
+        request("?cursor=" + jwtSigned, 422);
+        verifyNoInteractions(REPOSITORY);
+
+        when(REPOSITORY.facts(ACTOR)).thenReturn(new AccessPolicy.Facts(StaffRole.ORG_ADMIN, Set.of(), false));
+        when(REPOSITORY.list(ORG, true, Set.of(), cursor.id(), 21)).thenReturn(List.of());
+        request("?cursor=" + CURSORS.encode(cursor), 200);
+        verify(REPOSITORY).list(ORG, true, Set.of(), cursor.id(), 21);
     }
 
     private static org.springframework.mock.web.MockHttpServletResponse request(String suffix, int expected) throws Exception {

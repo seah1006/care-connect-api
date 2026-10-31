@@ -176,3 +176,16 @@ Claude가 리뷰 후 지적 사항을 회차별로 추가한다.
    - 수정: `common.pagination` 에 커서 키 설정을 둔다. 커서 키 = `HMAC-SHA256(jwtKey, "care-connect/cursor/v1")` 로 파생한다 (새 환경 변수 없이 분리). `ParticipantConfiguration` 의 빈은 이 파생 키를 쓰는 공통 `CursorCodec` 빈으로 바꾸고, 참가자 모듈 전용 설정은 지운다.
    - 테스트: (a) 파생 키가 JWT 키와 다르다, (b) JWT 키로 직접 서명한 커서는 목록 API에서 422로 거부된다, (c) 파생 키로 만든 커서는 그대로 동작한다. 기존 `CursorCodecProperties` 는 바꾸지 않는다.
    - 범위: `common/pagination/**` (새 설정 클래스), `participant/application/ParticipantConfiguration.java` (삭제 허용), `src/test/**`.
+
+### 2회차 (2026-10-31, Claude)
+
+샌드박스 밖에서 `./gradlew clean check pitest tlcCheck` (Docker 포함): **통과**.
+
+- 테스트 58개 전부 통과 (TASK-002 41개 → 58개)
+- PIT: 변이 141개 중 131개 탐지 (93%), 기준 80%
+- TLC: 두 모델 위반 없음
+- 커서 키 분리 반영 확인: `common.pagination.CursorConfiguration` 이 `HMAC-SHA256(jwtKey, "care-connect/cursor/v1")` 로 파생한 키를 쓴다. JWT 키로 서명한 커서는 422로 거부된다
+- 키 분리 전 커서는 더 이상 받지 않지만, 아직 배포 전이라 영향 없음
+- 범위 밖 변경, 보호 경로 변경, 테스트 약화 없음
+
+판단: 병합 (사용자 승인 후).
