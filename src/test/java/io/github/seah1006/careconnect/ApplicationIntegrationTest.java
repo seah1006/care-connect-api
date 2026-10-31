@@ -35,8 +35,10 @@ class ApplicationIntegrationTest extends PostgresSupport {
 
     @Test
     void contextStartsWithPostgresBaselineMigrationAndHealthyHttpEndpoint() throws Exception {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9000");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9001");
         assertThat(flyway.info().pending()).isEmpty();
+        assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history where version in ('4', '9001') and success",
+                Integer.class)).isEqualTo(2);
         assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history where version = '1' and success",
                 Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history where version in ('2', '9000') and success",

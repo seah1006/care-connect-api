@@ -14,9 +14,27 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
 @Tag("INV-ARCH-001")
+@Tag("INV-ARCH-002")
 @AnalyzeClasses(packages = "io.github.seah1006.careconnect", importOptions =
         com.tngtech.archunit.core.importer.ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
+    @ArchTest
+    static final ArchRule INV_ARCH_002_servicesAuditParticipantAccess = classes().that().resideInAPackage("..application..")
+            .should(new ArchCondition<>("depend on AccessLog when using participant repositories") {
+                @Override public void check(JavaClass type, ConditionEvents events) {
+                    var dependencies = type.getDirectDependenciesFromSelf();
+                    boolean repository = dependencies.stream().anyMatch(d -> d.getTargetClass().getPackageName()
+                            .startsWith("io.github.seah1006.careconnect.participant.repository"));
+                    boolean audit = dependencies.stream().anyMatch(d -> d.getTargetClass()
+                            .isEquivalentTo(io.github.seah1006.careconnect.common.audit.AccessLog.class));
+                    events.add(new SimpleConditionEvent(type, !repository || audit, type.getName() + " requires AccessLog"));
+                }
+            });
+
+    @ArchTest
+    static final ArchRule INV_ARCH_002_webDoesNotAudit = noClasses().that().resideInAPackage("..web..")
+            .should().dependOnClassesThat().resideInAPackage("..common.audit..");
+
     @ArchTest
     static final ArchRule webDoesNotMakeAuthorizationDecisions = noClasses().that().resideInAPackage("..web..")
             .should().dependOnClassesThat().belongToAnyOf(AccessPolicy.class, CurrentActor.class);

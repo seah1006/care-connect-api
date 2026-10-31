@@ -84,11 +84,44 @@ class ApplicationIntegrationTest {
             return TenantContext.callAs(org, () -> tx.execute(status -> operation.get()));
         }
         HttpResponse<byte[]> get(String token, String suffix, int expected) throws Exception {
+            var jwt = context.getBean(org.springframework.security.oauth2.jwt.JwtDecoder.class).decode(token);
+            UUID org = UUID.fromString(jwt.getClaimAsString("org"));
+            UUID user = UUID.fromString(jwt.getSubject());
+            Set<UUID> before = new HashSet<>(scoped(org, () -> jdbc.queryForList(
+                    "select id from access_log where actor_user_id=?", UUID.class, user)));
             var response = client.send(HttpRequest.newBuilder(URI.create(base + suffix))
                     .header("Authorization", "Bearer " + token).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
             assertThat(response.statusCode()).as(suffix).isEqualTo(expected);
             if (expected != 200) assertThat(response.headers().firstValue("Content-Type").orElseThrow())
                     .startsWith("application/problem+json");
+            var logs = scoped(org, () -> jdbc.queryForList("select * from access_log where actor_user_id=?", user))
+                    .stream().filter(row -> !before.contains(row.get("id"))).toList();
+            if (expected == 500) {
+                assertThat(logs).isEmpty();
+                assertThat(new String(response.body(), java.nio.charset.StandardCharsets.UTF_8))
+                        .doesNotContain("synthetic-participant", "items", "access_log", "permission denied");
+                assertThat(mapper.readTree(response.body()).path("status").asInt()).isEqualTo(500);
+            } else {
+                boolean single = suffix.startsWith("/");
+                String outcome = expected == 200 ? "ALLOWED" : expected == 403 ? "DENIED" : "NOT_FOUND";
+                List<UUID> resources = new ArrayList<>();
+                if (single) resources.add(UUID.fromString(suffix.substring(1)));
+                else if (expected == 200) {
+                    for (var item : mapper.readTree(response.body()).path("items")) resources.add(UUID.fromString(item.path("id").asString()));
+                }
+                if (resources.isEmpty()) resources.add(null);
+                assertThat(logs).hasSize(resources.size());
+                assertThat(logs.stream().map(row -> (UUID) row.get("resource_id")).toList())
+                        .containsExactlyInAnyOrderElementsOf(resources);
+                assertThat(logs.stream().map(row -> row.get("request_id")).distinct().count()).isEqualTo(1);
+                for (var row : logs) {
+                    assertThat(row).containsEntry("org_id", org).containsEntry("actor_user_id", user)
+                            .containsEntry("action", single ? "READ" : "LIST").containsEntry("outcome", outcome)
+                            .containsEntry("resource_type", "participant");
+                    assertThat(row.get("occurred_at")).isNotNull();
+                    assertThat(row.get("client_ip")).isIn("127.0.0.1", "0:0:0:0:0:0:0:1", "::1");
+                }
+            }
             return response;
         }
         Set<UUID> list(String token, int size) throws Exception {
@@ -113,7 +146,7 @@ class ApplicationIntegrationTest {
     static class Holder { static final Database DB = new Database(); }
     static Database db() { return Holder.DB; }
 
-    @Test @Tag("INV-AUTHZ-003") @Tag("INV-AUTHZ-002") @Tag("INV-API-001")
+    @Test @Tag("INV-AUTHZ-003") @Tag("INV-AUTHZ-002") @Tag("INV-API-001") @Tag("INV-AUDIT-001")
     void twentyRandomLayoutsMatchPolicyForEveryEmployeeAndHideForeignParticipants() throws Exception {
         Database d = db(); Random random = new Random(3003);
         for (int run = 0; run < 20; run++) {
@@ -254,6 +287,110 @@ class ApplicationIntegrationTest {
                 assertThat(d.list(token, 1)).isEqualTo(expected);
             }
         }
+    }
+
+    @Test @Tag("INV-AUDIT-002") @Tag("INV-TEN-001") @Tag("INV-TEN-002")
+    void accessLogPrivilegesRetentionConstraintsAndRls() throws Exception {
+        Database d = db(); UUID a = d.org(false), b = d.org(false), user = d.user(a, StaffRole.ORG_ADMIN);
+        UUID target = d.participant(a, null);
+        d.get(d.tokens.issue(user, a, StaffRole.ORG_ADMIN), "/" + target, 200);
+        UUID id = d.scoped(a, () -> d.jdbc.queryForObject("select id from access_log where org_id=?", UUID.class, a));
+        assertThat(d.jdbc.queryForObject("select relrowsecurity and relforcerowsecurity from pg_class where relname='access_log'", Boolean.class)).isTrue();
+        assertThat(d.jdbc.queryForList("select * from access_log")).isEmpty();
+        assertThat(d.scoped(b, () -> d.jdbc.queryForList("select * from access_log where id=?", id))).isEmpty();
+        assertThat(d.scoped(a, () -> d.jdbc.queryForList("select org_id from access_log", UUID.class))).containsOnly(a);
+        rejects("42501", () -> d.scoped(a, () -> d.jdbc.update("update access_log set outcome='DENIED' where id=?", id)));
+        rejects("42501", () -> d.scoped(a, () -> d.jdbc.update("delete from access_log where id=?", id)));
+        rejects("42501", () -> d.owner.update("update access_log set outcome='DENIED' where id=?", id));
+        rejects("42501", () -> d.owner.update("delete from access_log where id=?", id));
+        rejects("42501", () -> d.owner.execute("truncate access_log"));
+        String insert = "insert into access_log(id,org_id,actor_user_id,action,resource_type,outcome,occurred_at,request_id) "
+                + "values (?,?,?,'READ','participant','ALLOWED',now(),?)";
+        rejects("42501", () -> d.scoped(a, () -> d.jdbc.update(insert, UUID.randomUUID(), b, user, UUID.randomUUID())));
+        rejects("23502", () -> d.owner.update(insert, UUID.randomUUID(), null, user, UUID.randomUUID()));
+        rejects("23503", () -> d.owner.update(insert, UUID.randomUUID(), UUID.randomUUID(), user, UUID.randomUUID()));
+        rejects("23514", () -> d.owner.update(insert.replace("'READ'", "'INVALID'"), UUID.randomUUID(), a, user, UUID.randomUUID()));
+        rejects("23514", () -> d.owner.update(insert.replace("'ALLOWED'", "'INVALID'"), UUID.randomUUID(), a, user, UUID.randomUUID()));
+        UUID old = UUID.randomUUID();
+        d.owner.update(insert.replace("now()", "now()-interval '2 years 1 day'"), old, a, user, UUID.randomUUID());
+        // Application account cannot delete even records past the retention period.
+        rejects("42501", () -> d.scoped(a, () -> d.jdbc.update("delete from access_log where id=?", old)));
+        assertThat(d.owner.update("delete from access_log where id=?", old)).isEqualTo(1);
+    }
+
+    @Test @Tag("INV-AUDIT-001") @Tag("INV-AUDIT-003")
+    void recordsCommitOutsideCallerRollbackAndInsertFailureBlocksResponses() throws Exception {
+        Database d = db(); UUID org = d.org(false), user = d.user(org, StaffRole.STAFF);
+        UUID target = d.participant(org, null);
+        String token = d.tokens.issue(user, org, StaffRole.STAFF);
+        d.get(token, "/" + target, 403);
+        d.get(token, "/" + UUID.randomUUID(), 404);
+        assertThat(d.scoped(org, () -> d.jdbc.queryForList("select outcome from access_log where actor_user_id=?", String.class, user)))
+                .containsExactlyInAnyOrder("DENIED", "NOT_FOUND");
+        d.scoped(org, () -> d.jdbc.update("delete from membership where user_id=?", user));
+        d.get(token, "", 403);
+        d.scoped(org, () -> d.jdbc.update("insert into membership values (?,?,?,'ORG_ADMIN')", UUID.randomUUID(), org, user));
+        var audit = d.context.getBean(io.github.seah1006.careconnect.common.audit.AccessLog.class);
+        UUID resource = UUID.randomUUID();
+        d.scoped(org, () -> {
+            audit.record(new io.github.seah1006.careconnect.common.audit.AccessEvent(org, user,
+                    io.github.seah1006.careconnect.common.audit.AccessEvent.Action.READ, "participant", resource,
+                    io.github.seah1006.careconnect.common.audit.AccessEvent.Outcome.NOT_FOUND));
+            return null;
+        });
+        // Explicit rollback of the surrounding transaction must leave the independent insert committed.
+        io.github.seah1006.careconnect.common.tenancy.TenantContext.callAs(org, () -> d.tx.execute(status -> {
+            audit.record(new io.github.seah1006.careconnect.common.audit.AccessEvent(org, user,
+                    io.github.seah1006.careconnect.common.audit.AccessEvent.Action.READ, "participant", resource,
+                    io.github.seah1006.careconnect.common.audit.AccessEvent.Outcome.DENIED));
+            status.setRollbackOnly(); return null;
+        }));
+        assertThat(d.scoped(org, () -> d.jdbc.queryForObject("select count(*) from access_log where resource_id=?", Integer.class, resource))).isEqualTo(2);
+        d.owner.execute("revoke insert on access_log from care_test_app");
+        try {
+            d.get(token, "/" + target, 500);
+            d.get(token, "", 500);
+        } finally { d.owner.execute("grant insert on access_log to care_test_app"); }
+        d.get(token, "/" + target, 200);
+        d.get(token, "", 200);
+    }
+
+    @Test @Tag("INV-AUDIT-001") @Tag("INV-AUDIT-003")
+    void failedRowInListBatchRollsBackEveryRecordAndReturnsNoParticipantData() throws Exception {
+        Database d = db();
+        UUID org = d.org(false), user = d.user(org, StaffRole.ORG_ADMIN);
+        var participants = List.of(d.participant(org, null), d.participant(org, null)).stream()
+                .sorted(Comparator.comparing(UUID::toString)).toList();
+        String token = d.tokens.issue(user, org, StaffRole.ORG_ADMIN);
+        d.owner.execute("alter table access_log add constraint synthetic_batch_failure check (resource_id <> '"
+                + participants.getLast() + "'::uuid) not valid");
+        try {
+            d.get(token, "", 500);
+            assertThat(d.scoped(org, () -> d.jdbc.queryForObject(
+                    "select count(*) from access_log where actor_user_id=?", Integer.class, user))).isZero();
+        } finally {
+            d.owner.execute("alter table access_log drop constraint synthetic_batch_failure");
+        }
+        d.get(token, "", 200);
+    }
+
+    @Test @Tag("INV-SENS-003")
+    void rawDatabaseCiphertextHidesPlaintextAndCannotBeCopiedToAnotherRow() {
+        Database d = db(); UUID org = d.org(false), first = UUID.randomUUID(), second = UUID.randomUUID();
+        var cipher = d.context.getBean(io.github.seah1006.careconnect.common.crypto.FieldCipher.class);
+        var slot = new io.github.seah1006.careconnect.common.crypto.FieldSlot(org, "sensitive_probe", "secret", first);
+        String plaintext = "synthetic-sensitive-value-\ud83d\ude00";
+        String sealed = cipher.seal(plaintext, slot);
+        d.scoped(org, () -> d.jdbc.update("insert into sensitive_probe values (?,?,?)", first, org, sealed));
+        String raw = d.scoped(org, () -> d.jdbc.queryForObject("select secret from sensitive_probe where id=?", String.class, first));
+        assertThat(raw).isEqualTo(sealed).doesNotContain(plaintext);
+        assertThat(cipher.open(raw, slot)).isEqualTo(plaintext);
+        d.scoped(org, () -> d.jdbc.update("insert into sensitive_probe select ?,org_id,secret from sensitive_probe where id=?", second, first));
+        String copied = d.scoped(org, () -> d.jdbc.queryForObject("select secret from sensitive_probe where id=?", String.class, second));
+        assertThatThrownBy(() -> cipher.open(copied,
+                new io.github.seah1006.careconnect.common.crypto.FieldSlot(org, "sensitive_probe", "secret", second)))
+                .isExactlyInstanceOf(io.github.seah1006.careconnect.common.crypto.FieldDecryptionFailed.class)
+                .hasMessage("Field decryption failed");
     }
 
     private static void rejects(String state, org.assertj.core.api.ThrowableAssert.ThrowingCallable operation) {
