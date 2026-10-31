@@ -35,6 +35,7 @@ class ParticipantApiTest {
     static final Actor ACTOR = new Actor(USER, ORG);
     static final String TOKEN = SECURITY.access.issue(USER, ORG, StaffRole.ORG_ADMIN);
     static final ParticipantRepository REPOSITORY = mock(ParticipantRepository.class);
+    static final io.github.seah1006.careconnect.common.audit.AccessLog AUDIT = mock(io.github.seah1006.careconnect.common.audit.AccessLog.class);
     static final CursorCodec CURSORS;
     static final MockMvc MVC;
     static {
@@ -52,7 +53,7 @@ class ParticipantApiTest {
         @Bean ObjectMapper objectMapper() { return JsonMapper.builder().build(); }
         @Bean org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder() { return SECURITY.decoder; }
         @Bean javax.crypto.SecretKey jwtKey() { return SECURITY.key; }
-        @Bean ParticipantService service(CursorCodec cursors) { return new ParticipantService(new CurrentActor(), REPOSITORY, cursors); }
+        @Bean ParticipantService service(CursorCodec cursors) { return new ParticipantService(new CurrentActor(), REPOSITORY, cursors, AUDIT); }
     }
 
     @Provide Arbitrary<String> names() {
@@ -125,6 +126,24 @@ class ParticipantApiTest {
         when(REPOSITORY.list(ORG, true, Set.of(), cursor.id(), 21)).thenReturn(List.of());
         request("?cursor=" + CURSORS.encode(cursor), 200);
         verify(REPOSITORY).list(ORG, true, Set.of(), cursor.id(), 21);
+    }
+
+    @Test @org.junit.jupiter.api.Tag("INV-AUDIT-003")
+    void auditFailureReturnsOnlyGenericProblemForReadAndList() throws Exception {
+        reset(REPOSITORY, AUDIT);
+        UUID id = UUID.randomUUID();
+        when(REPOSITORY.find(ORG, id)).thenReturn(Optional.of(new ParticipantView(id, "synthetic-private-name", null)));
+        when(REPOSITORY.facts(ACTOR)).thenReturn(new AccessPolicy.Facts(StaffRole.ORG_ADMIN, Set.of(), false));
+        when(REPOSITORY.list(ORG, true, Set.of(), null, 21)).thenReturn(List.of(new ParticipantView(id, "synthetic-private-name", null)));
+        doThrow(new org.springframework.dao.DataAccessResourceFailureException("synthetic-internal-error"))
+                .when(AUDIT).record(any());
+        try {
+            for (String suffix : List.of("/" + id, "")) {
+                String body = request(suffix, 500).getContentAsString();
+                assertThat(body).doesNotContain("synthetic-private-name", "synthetic-internal-error", id.toString(), "items");
+                assertThat(JsonMapper.builder().build().readTree(body).path("status").asInt()).isEqualTo(500);
+            }
+        } finally { reset(AUDIT); }
     }
 
     private static org.springframework.mock.web.MockHttpServletResponse request(String suffix, int expected) throws Exception {

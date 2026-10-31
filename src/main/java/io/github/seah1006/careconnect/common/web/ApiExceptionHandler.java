@@ -25,6 +25,11 @@ public class ApiExceptionHandler {
 
     public ApiExceptionHandler(ObjectMapper mapper) { this.mapper = mapper; }
 
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public void storageFailure(HttpServletResponse response) throws IOException {
+        SecurityProblems.write(mapper, response, HttpStatus.INTERNAL_SERVER_ERROR, "Request failed");
+    }
+
     @ExceptionHandler(AccessDenied.class)
     public void forbidden(HttpServletResponse response) throws IOException {
         SecurityProblems.write(mapper, response, HttpStatus.FORBIDDEN, "Access denied");

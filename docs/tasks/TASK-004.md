@@ -161,3 +161,29 @@
 ## 리뷰 기록
 
 Claude가 리뷰 후 지적 사항을 회차별로 추가한다.
+
+### 1회차 (2026-10-31, Claude)
+
+샌드박스 밖에서 `./gradlew clean check pitest tlcCheck` (Docker 포함): **통과**.
+
+- 테스트 77개 전부 통과
+- PIT: 변이 208개 중 198개 탐지 (95%), 기준 80%
+- TLC: 두 모델 위반 없음
+- 범위, 보호 경로, 테스트 삭제·약화 문제 없음. 기존 테스트 변경은 Flyway 최신 버전 9000 → 9001 (테스트 마이그레이션 추가에 따른 것)과 규칙·설정 추가뿐
+- 리뷰어 음성 확인 (Docker, 모두 원복):
+  1. 수정 방지 트리거 제거 → `accessLogPrivilegesRetentionConstraintsAndRls` 실패
+  2. 기록기의 `REQUIRES_NEW` 를 `REQUIRED` 로 → 통합 테스트 4개 실패
+  3. `access_log` 의 `FORCE ROW LEVEL SECURITY` 제거 → `accessLogPrivilegesRetentionConstraintsAndRls` 실패
+  4. 단건 `NOT_FOUND` 기록 누락 → `ParticipantAuditProperties`, 통합 테스트 2개 실패
+
+고칠 것:
+
+1. **목록 조회가 이용자마다 별도 트랜잭션으로 기록한다**
+   - 지금은 응답 이용자마다 `accessLog.record` 를 불러, 한 페이지(최대 100명)에 커밋이 최대 100번 일어난다. 느리고, 중간에 실패하면 일부만 남는다.
+   - 수정: `AccessLog.recordAll(List<AccessEvent>)` 를 추가해 한 요청의 목록 기록을 **한 트랜잭션(`REQUIRES_NEW`)의 배치 insert** 로 남긴다. 전부 남거나 하나도 안 남는다. 목록 서비스는 이것만 쓴다. 단건은 기존 `record` 유지 (`record` 는 `recordAll(List.of(e))` 로 구현해도 된다).
+   - 테스트: (a) 배치 중 실패하면 그 요청의 기록이 0행이고 응답에 이용자 데이터가 없다 (L5, `docker`. 예: 배치의 한 행이 CHECK 위반이 되게 하는 테스트 전용 기록기, 또는 기존 권한 회수 방식), (b) 목록 한 번에 기록 트랜잭션이 한 번만 시작된다 (L2, 트랜잭션 횟수를 세는 테스트 대역).
+2. **기록 실패 원인이 서버 어디에도 남지 않는다**
+   - `JdbcAccessLog` 는 원래 예외를 버리고 새 예외를 만들고, `ApiExceptionHandler.storageFailure` 는 로그 없이 500만 돌려준다. 운영 중 접속기록 실패를 알아챌 방법이 없다.
+   - 수정: 새 예외에 원래 예외를 `cause` 로 붙인다. `storageFailure` 는 서버 로그에 `ERROR` 로 남긴다 (예외 종류와 요청 ID만. 요청 경로의 ID, 이용자 정보, SQL 파라미터는 남기지 않는다). 응답 본문은 지금처럼 일반 문구만.
+   - 테스트: 응답 본문에 원래 예외 메시지가 나오지 않는 기존 검증 유지.
+   - 범위: `common/audit/**`, `common/web/ApiExceptionHandler.java`, `participant/application/**`, `src/test/**`.

@@ -20,6 +20,17 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
         com.tngtech.archunit.core.importer.ImportOption.DoNotIncludeTests.class)
 class TenantArchitectureTest {
     @ArchTest
+    static final ArchRule accessEventsCarryAnOrganization = classes().that()
+            .haveFullyQualifiedName("io.github.seah1006.careconnect.common.audit.AccessEvent")
+            .should(new ArchCondition<>("carry UUID orgId") {
+                @Override public void check(JavaClass type, ConditionEvents events) {
+                    boolean valid = type.getAllFields().stream().anyMatch(f -> f.getName().equals("orgId")
+                            && f.getRawType().isEquivalentTo(UUID.class));
+                    events.add(new SimpleConditionEvent(type, valid, type.getName() + " requires UUID orgId"));
+                }
+            });
+
+    @ArchTest
     static final ArchRule ownedEntitiesHaveTenantId = classes().that().implement(OrgOwned.class)
             .should(new ArchCondition<>("have a UUID orgId annotated with @TenantId") {
                 @Override public void check(JavaClass type, ConditionEvents events) {

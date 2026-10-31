@@ -23,6 +23,7 @@ public abstract class PostgresSupport {
         set.accept("spring.flyway.password", POSTGRES.getPassword());
         set.accept("spring.flyway.placeholders.applicationUser", "care_test_app");
         set.accept("security.jwt-secret", SecurityFixture.SECRET);
+        io.github.seah1006.careconnect.common.crypto.CryptoFixture.properties(set);
     }
 
     @DynamicPropertySource
